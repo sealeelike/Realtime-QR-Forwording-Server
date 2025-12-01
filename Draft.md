@@ -26,4 +26,4 @@
 - online status will be recorded, including IP address (for account abuse detection), time (for [user static](#user-static)), and user id. 
 
 ### Hall(Not considering at the moment)
-Providers and consumers can reach an agreement in advance, even a deal.
+Providers and consumers can reach an agreement or even a deal in advance.
