@@ -5,6 +5,7 @@
 
 ## Consumer terminal
 - Get the real time url with remaining time
+- calculate end-to-end latency by comparing timestamp and standard time
 
 ## Server terminal
 
