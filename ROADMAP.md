@@ -61,6 +61,9 @@
 
 ### User Features
 - [x] Username change (once for users, unlimited for admin/owner)
+- [x] Password change (once per session)
+- [x] Admin daily user creation limit (3 per day)
+- [x] User notes (owner only)
 
 ---
 

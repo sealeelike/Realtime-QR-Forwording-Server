@@ -55,6 +55,13 @@ try {
   // Column already exists
 }
 
+// Add notes column for owner remarks
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN notes TEXT`);
+} catch (e) {
+  // Column already exists
+}
+
 // Role hierarchy: owner > admin > user
 const ROLES = {
   owner: 3,
@@ -99,7 +106,7 @@ const userOps = {
   
   updateLastLogin: db.prepare(`UPDATE users SET last_login = ? WHERE id = ?`),
   
-  listAll: db.prepare(`SELECT id, username, role, is_banned, login_failures, must_change_password, username_changed, created_at, last_login FROM users WHERE role != 'owner'`),
+  listAll: db.prepare(`SELECT id, username, role, is_banned, login_failures, must_change_password, username_changed, created_at, last_login, notes FROM users WHERE role != 'owner'`),
   
   deleteUser: db.prepare(`DELETE FROM users WHERE id = ? AND role = 'user'`),
   
@@ -109,7 +116,14 @@ const userOps = {
   
   updateUsername: db.prepare(`UPDATE users SET username = ?, username_changed = 1 WHERE id = ?`),
   
-  updateSessionToken: db.prepare(`UPDATE users SET session_token = ? WHERE id = ?`)
+  updateSessionToken: db.prepare(`UPDATE users SET session_token = ? WHERE id = ?`),
+  
+  countCreatedToday: db.prepare(`
+    SELECT COUNT(*) as count FROM users 
+    WHERE created_by = ? AND created_at >= ?
+  `),
+  
+  updateNotes: db.prepare(`UPDATE users SET notes = ? WHERE id = ?`)
 };
 
 // IP ban operations

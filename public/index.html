@@ -31,7 +31,8 @@
     <span id="admin-nav"></span>
     <span class="current-user">
       <span id="currentUser"></span>
-      <span class="edit-btn" id="editUsername" onclick="showUsernameModal()">Edit</span> | 
+      <span class="edit-btn" id="editUsername" onclick="showUsernameModal()">Edit</span>
+      <span class="edit-btn" id="editPassword" onclick="showPasswordModal()">Password</span> | 
       <span class="logout-btn" onclick="logout()">Logout</span>
     </span>
   </nav>
@@ -45,6 +46,21 @@
       <div class="btn-row">
         <button class="btn-cancel" onclick="hideUsernameModal()">Cancel</button>
         <button class="btn-primary" onclick="changeUsername()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Change Modal -->
+  <div id="passwordModal" class="modal">
+    <div class="modal-content">
+      <h3>Change Password</h3>
+      <input type="password" id="oldPassword" placeholder="Current password">
+      <input type="password" id="newPassword" placeholder="New password (min 6 characters)">
+      <input type="password" id="confirmPassword" placeholder="Confirm new password">
+      <p class="username-info" id="passwordInfo"></p>
+      <div class="btn-row">
+        <button class="btn-cancel" onclick="hidePasswordModal()">Cancel</button>
+        <button class="btn-primary" onclick="changePassword()">Save</button>
       </div>
     </div>
   </div>
@@ -106,6 +122,11 @@
         } else {
           infoEl.textContent = 'As ' + currentUser.role + ', you can change your username unlimited times.';
         }
+        
+        // Hide password button if already changed this session
+        if (currentUser.passwordChangedThisSession) {
+          document.getElementById('editPassword').style.display = 'none';
+        }
       } catch {
         window.location.href = '/login.html';
       }
@@ -123,6 +144,52 @@
 
     function hideUsernameModal() {
       document.getElementById('usernameModal').classList.remove('active');
+    }
+
+    function showPasswordModal() {
+      document.getElementById('oldPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmPassword').value = '';
+      document.getElementById('passwordInfo').textContent = 'You can only change password once per session.';
+      document.getElementById('passwordModal').classList.add('active');
+    }
+
+    function hidePasswordModal() {
+      document.getElementById('passwordModal').classList.remove('active');
+    }
+
+    async function changePassword() {
+      const oldPassword = document.getElementById('oldPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      
+      if (!oldPassword || !newPassword || !confirmPassword) {
+        alert('Please fill all fields');
+        return;
+      }
+      if (newPassword.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        alert('Passwords do not match');
+        return;
+      }
+      
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword, confirmPassword })
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        alert('Password changed successfully');
+        hidePasswordModal();
+        document.getElementById('editPassword').style.display = 'none';
+      } else {
+        alert(data.error || 'Failed to change password');
+      }
     }
 
     async function changeUsername() {

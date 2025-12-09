@@ -16,14 +16,15 @@ if (!process.env.JWT_SECRET) {
   console.warn('WARNING: JWT_SECRET not set. Using random secret (sessions will invalidate on restart).');
 }
 
-function createToken(user, sessionToken) {
+function createToken(user, sessionToken, options = {}) {
   return jwt.sign(
     { 
       id: user.id, 
       username: user.username, 
       role: user.role,
       mustChangePassword: !!user.must_change_password,
-      sessionToken
+      sessionToken,
+      passwordChangedThisSession: !!options.passwordChangedThisSession
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES }
@@ -123,8 +124,9 @@ function changePassword(userId, oldPassword, newPassword) {
   logger.userAction('password_changed', { userId, username: user.username });
   
   // Return new token without mustChangePassword flag (keep same session token)
+  // Mark passwordChangedThisSession to prevent multiple changes per session
   const updatedUser = userOps.findById.get(userId);
-  const token = createToken(updatedUser, updatedUser.session_token);
+  const token = createToken(updatedUser, updatedUser.session_token, { passwordChangedThisSession: true });
   
   return { success: true, token };
 }

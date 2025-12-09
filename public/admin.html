@@ -80,9 +80,9 @@
             <tr style="border-bottom:2px solid #000;">
               <th style="text-align:left; padding:0.5rem;">Username</th>
               <th style="text-align:left; padding:0.5rem;">Role</th>
-              <th style="text-align:left; padding:0.5rem;">Status</th>
               <th style="text-align:left; padding:0.5rem;">Failures</th>
               <th style="text-align:left; padding:0.5rem;">Last Login</th>
+              <th style="text-align:left; padding:0.5rem;" id="notes-header" style="display:none;">Notes</th>
               <th style="text-align:left; padding:0.5rem;">Actions</th>
             </tr>
           </thead>
@@ -191,6 +191,7 @@
         // Owner-only features
         if (currentUser.role === 'owner') {
           document.getElementById('logs-tab').style.display = '';
+          document.getElementById('notes-header').style.display = '';
         } else {
           document.querySelector('#newUserRole option[value="admin"]').disabled = true;
         }
@@ -264,12 +265,18 @@
               }
             }
             
+            const notesCell = currentUser.role === 'owner' 
+              ? `<td style="padding:0.5rem;">
+                  <input type="text" value="${user.notes || ''}" style="width:60px;font-size:12px;" onchange="updateNotes(${user.id}, this.value)" placeholder="...">
+                </td>` 
+              : '';
+            
             tr.innerHTML = `
-              <td style="padding:0.5rem;">${user.username}</td>
+              <td style="padding:0.5rem;">${user.username}${user.is_banned ? ' <span class="status-banned">[BAN]</span>' : ''}</td>
               <td style="padding:0.5rem;"><span class="user-role role-${user.role}">${user.role}</span></td>
-              <td style="padding:0.5rem;">${user.is_banned ? '<span class="status-banned">BANNED</span>' : 'Active'}</td>
               <td style="padding:0.5rem;">${user.login_failures}</td>
               <td style="padding:0.5rem;">${lastLogin}</td>
+              ${notesCell}
               <td style="padding:0.5rem;">
                 ${roleButtons}
                 ${user.is_banned 
@@ -331,6 +338,19 @@
         loadUsers();
       } else {
         alert(data.error || 'Failed to demote user');
+      }
+    }
+
+    async function updateNotes(id, notes) {
+      const res = await fetch(`/api/admin/users/${id}/notes`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.error || 'Failed to update notes');
+        loadUsers();
       }
     }
 

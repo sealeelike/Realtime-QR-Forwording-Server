@@ -46,7 +46,8 @@ async function userRoutes(fastify) {
         ...request.user,
         username: dbUser ? dbUser.username : request.user.username,
         mustChangePassword: dbUser ? !!dbUser.must_change_password : false,
-        usernameChanged: dbUser ? !!dbUser.username_changed : false
+        usernameChanged: dbUser ? !!dbUser.username_changed : false,
+        passwordChangedThisSession: !!request.user.passwordChangedThisSession
       }
     };
   });
@@ -57,6 +58,11 @@ async function userRoutes(fastify) {
 
     if (!request.user) {
       return reply.code(401).send({ error: 'Not authenticated' });
+    }
+
+    // Check if password was already changed in this session
+    if (request.user.passwordChangedThisSession) {
+      return reply.code(403).send({ error: 'Password can only be changed once per session. Please re-login to change again.' });
     }
 
     if (!newPassword || !confirmPassword) {
@@ -103,6 +109,15 @@ async function userRoutes(fastify) {
     
     if (role === 'owner') {
       return reply.code(403).send({ error: 'Cannot create owner accounts' });
+    }
+
+    // Admin daily limit: 3 users per day (owner unlimited)
+    if (request.user.role === 'admin') {
+      const todayStart = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
+      const created = userOps.countCreatedToday.get(request.user.username, todayStart);
+      if (created.count >= 3) {
+        return reply.code(403).send({ error: 'Daily limit reached. Admins can only create 3 users per day.' });
+      }
     }
 
     const username = generateUsername();
@@ -278,6 +293,25 @@ async function userRoutes(fastify) {
     });
 
     return { success: true, message: `User ${user.username} is now ${role}` };
+  });
+
+  // === Notes management (owner only) ===
+  fastify.put('/api/admin/users/:id/notes', { preHandler: requireRole('owner') }, async (request, reply) => {
+    const userId = parseInt(request.params.id);
+    const { notes } = request.body || {};
+    const user = userOps.findById.get(userId);
+
+    if (!user) {
+      return reply.code(404).send({ error: 'User not found' });
+    }
+
+    userOps.updateNotes.run(notes || '', userId);
+    logger.userAction('notes_updated', {
+      updatedBy: request.user.username,
+      targetUser: user.username
+    });
+
+    return { success: true };
   });
 
   // === Username change ===
