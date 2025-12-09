@@ -3,21 +3,27 @@ const fp = require('fastify-plugin');
 const { userOps, ipOps, ROLES } = require('./database');
 const logger = require('./logger');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production-' + require('crypto').randomBytes(16).toString('hex');
+const crypto = require('crypto');
+const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production-' + crypto.randomBytes(16).toString('hex');
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '24h';
 const MAX_LOGIN_FAILURES = 4;
+
+function generateSessionToken() {
+  return crypto.randomBytes(16).toString('hex');
+}
 
 if (!process.env.JWT_SECRET) {
   console.warn('WARNING: JWT_SECRET not set. Using random secret (sessions will invalidate on restart).');
 }
 
-function createToken(user) {
+function createToken(user, sessionToken) {
   return jwt.sign(
     { 
       id: user.id, 
       username: user.username, 
       role: user.role,
-      mustChangePassword: !!user.must_change_password
+      mustChangePassword: !!user.must_change_password,
+      sessionToken
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES }
@@ -78,9 +84,13 @@ function login(username, password, ip) {
   userOps.updateLoginFailures.run(0, user.id);
   userOps.updateLastLogin.run(Date.now(), user.id);
   
+  // Generate new session token (kicks off old sessions)
+  const sessionToken = generateSessionToken();
+  userOps.updateSessionToken.run(sessionToken, user.id);
+  
   logger.security('login_success', { username, ip, userId: user.id });
 
-  const token = createToken(user);
+  const token = createToken(user, sessionToken);
   return {
     success: true,
     token,
@@ -112,9 +122,9 @@ function changePassword(userId, oldPassword, newPassword) {
   userOps.updatePassword.run(newPassword, userId);
   logger.userAction('password_changed', { userId, username: user.username });
   
-  // Return new token without mustChangePassword flag
+  // Return new token without mustChangePassword flag (keep same session token)
   const updatedUser = userOps.findById.get(userId);
-  const token = createToken(updatedUser);
+  const token = createToken(updatedUser, updatedUser.session_token);
   
   return { success: true, token };
 }
@@ -156,9 +166,9 @@ function authPlugin(fastify, opts, done) {
           reply.clearCookie('token', { path: '/' });
           return reply.redirect('/login.html');
         }
-        // Check if user is banned
+        // Check if user is banned or session invalidated
         const user = userOps.findById.get(payload.id);
-        if (!user || user.is_banned) {
+        if (!user || user.is_banned || user.session_token !== payload.sessionToken) {
           reply.clearCookie('token', { path: '/' });
           return reply.redirect('/login.html');
         }
@@ -182,10 +192,13 @@ function authPlugin(fastify, opts, done) {
       return reply.code(401).send({ error: 'Invalid or expired token' });
     }
 
-    // Check if user still exists and not banned
+    // Check if user still exists, not banned, and session is valid
     const user = userOps.findById.get(payload.id);
     if (!user || user.is_banned) {
       return reply.code(401).send({ error: 'Account not available' });
+    }
+    if (user.session_token !== payload.sessionToken) {
+      return reply.code(401).send({ error: 'Session expired (logged in elsewhere)', code: 'SESSION_EXPIRED' });
     }
 
     request.user = payload;

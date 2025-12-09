@@ -48,6 +48,13 @@ try {
   // Column already exists
 }
 
+// Add session_token column for single-session enforcement
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN session_token TEXT`);
+} catch (e) {
+  // Column already exists
+}
+
 // Role hierarchy: owner > admin > user
 const ROLES = {
   owner: 3,
@@ -100,7 +107,9 @@ const userOps = {
   
   updateRole: db.prepare(`UPDATE users SET role = ? WHERE id = ?`),
   
-  updateUsername: db.prepare(`UPDATE users SET username = ?, username_changed = 1 WHERE id = ?`)
+  updateUsername: db.prepare(`UPDATE users SET username = ?, username_changed = 1 WHERE id = ?`),
+  
+  updateSessionToken: db.prepare(`UPDATE users SET session_token = ? WHERE id = ?`)
 };
 
 // IP ban operations
