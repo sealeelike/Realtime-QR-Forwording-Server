@@ -1,0 +1,18 @@
+{
+  "name": "realtime-qr-forwarding-server",
+  "version": "1.0.0",
+  "description": "Forward QR code URLs to other users in real-time",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.1",
+    "@fastify/static": "^7.0.4",
+    "@fastify/websocket": "^10.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

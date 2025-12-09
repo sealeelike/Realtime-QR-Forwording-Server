@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Forwarding</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/producer.html">Producer</a>
+    <a href="/consumer.html">Consumer</a>
+  </nav>
+  
+  <div class="container">
+    <h1>QR Code URL Forwarding</h1>
+    
+    <div class="section">
+      <h2>Create Channel (Producer)</h2>
+      <p class="info">Scan QR codes and forward URLs to consumers in real-time.</p>
+      <div class="flex-row">
+        <input type="text" id="create-channel-id" placeholder="Channel ID (letters & numbers only)">
+        <button type="button" id="btn-random-id">Random</button>
+      </div>
+      <input type="password" id="create-password" placeholder="Channel password (optional)">
+      <button id="btn-create">Create Channel</button>
+    </div>
+    
+    <div class="section">
+      <h2>Join Channel (Consumer)</h2>
+      <p class="info">Receive URLs forwarded by a producer.</p>
+      <input type="text" id="join-channel-id" placeholder="Channel ID">
+      <input type="password" id="join-password" placeholder="Password (if required)">
+      <button id="btn-join">Join Channel</button>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('btn-random-id').addEventListener('click', () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let id = '';
+      for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+      document.getElementById('create-channel-id').value = id;
+    });
+
+    document.getElementById('btn-create').addEventListener('click', () => {
+      const channelId = document.getElementById('create-channel-id').value.trim();
+      const password = document.getElementById('create-password').value;
+      const params = new URLSearchParams();
+      if (channelId) params.append('channel', channelId);
+      if (password) params.append('password', password);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      window.location.href = `/producer.html${query}`;
+    });
+
+    document.getElementById('btn-join').addEventListener('click', () => {
+      const channelId = document.getElementById('join-channel-id').value.trim();
+      const password = document.getElementById('join-password').value;
+      if (!channelId) {
+        alert('Please enter a channel ID');
+        return;
+      }
+      const params = new URLSearchParams({ channel: channelId });
+      if (password) params.append('password', password);
+      window.location.href = `/consumer.html?${params.toString()}`;
+    });
+  </script>
+</body>
+</html>

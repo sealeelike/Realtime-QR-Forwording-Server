@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consumer - QR Forwarding</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/producer.html">Producer</a>
+    <a href="/consumer.html">Consumer</a>
+  </nav>
+  
+  <div class="container">
+    <h1>Consumer</h1>
+    
+    <div id="status" class="status disconnected">Connecting...</div>
+    
+    <div id="join-form" class="section">
+      <h2>Join Channel</h2>
+      <input type="text" id="channel-id-input" placeholder="Channel ID">
+      <input type="password" id="password-input" placeholder="Password (if required)">
+      <button id="btn-join">Join</button>
+    </div>
+    
+    <div id="url-section" class="section hidden">
+      <h2>Current URL</h2>
+      <div class="timer" id="timer">--</div>
+      <div class="url-display" id="current-url">Waiting for URL...</div>
+      <p class="latency" id="latency"></p>
+      <button id="btn-open-url" disabled>Open URL</button>
+    </div>
+  </div>
+
+  <script src="/js/consumer.js"></script>
+</body>
+</html>

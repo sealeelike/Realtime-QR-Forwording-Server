@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - QR Forwarding</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/producer.html">Producer</a>
+    <a href="/consumer.html">Consumer</a>
+    <a href="/admin.html">Admin</a>
+  </nav>
+  
+  <div class="container">
+    <h1>Admin Panel</h1>
+    
+    <div class="section">
+      <h2>Server Configuration</h2>
+      <label class="info">Domain (for share links)</label>
+      <input type="text" id="domain" placeholder="https://example.com">
+      <p class="info">Leave empty to use current host. Include protocol (https://)</p>
+      <button id="btn-save">Save Configuration</button>
+      <p class="info" id="save-status"></p>
+    </div>
+    
+    <div class="section">
+      <h2>Active Channels</h2>
+      <button id="btn-refresh">Refresh</button>
+      <table id="channels-table" style="width:100%; margin-top:1rem; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid #000;">
+            <th style="text-align:left; padding:0.5rem;">ID</th>
+            <th style="text-align:left; padding:0.5rem;">Password</th>
+            <th style="text-align:left; padding:0.5rem;">Consumers</th>
+          </tr>
+        </thead>
+        <tbody id="channels-body">
+        </tbody>
+      </table>
+      <p class="info" id="no-channels">No active channels</p>
+    </div>
+  </div>
+
+  <script>
+    const domainInput = document.getElementById('domain');
+    const btnSave = document.getElementById('btn-save');
+    const saveStatus = document.getElementById('save-status');
+    const btnRefresh = document.getElementById('btn-refresh');
+    const channelsBody = document.getElementById('channels-body');
+    const noChannels = document.getElementById('no-channels');
+
+    // Load current config
+    fetch('/api/admin/config')
+      .then(res => res.json())
+      .then(config => {
+        domainInput.value = config.domain || '';
+      });
+
+    btnSave.addEventListener('click', () => {
+      fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: domainInput.value.trim() })
+      })
+      .then(res => res.json())
+      .then(data => {
+        saveStatus.textContent = 'Configuration saved!';
+        setTimeout(() => { saveStatus.textContent = ''; }, 2000);
+      })
+      .catch(() => {
+        saveStatus.textContent = 'Failed to save';
+      });
+    });
+
+    function loadChannels() {
+      fetch('/api/admin/channels')
+        .then(res => res.json())
+        .then(data => {
+          channelsBody.innerHTML = '';
+          if (data.channels.length === 0) {
+            noChannels.style.display = 'block';
+          } else {
+            noChannels.style.display = 'none';
+            data.channels.forEach(ch => {
+              const tr = document.createElement('tr');
+              tr.style.borderBottom = '1px solid #ddd';
+              tr.innerHTML = `
+                <td style="padding:0.5rem; font-family:monospace;">${ch.id}</td>
+                <td style="padding:0.5rem;">${ch.hasPassword ? 'Yes' : 'No'}</td>
+                <td style="padding:0.5rem;">${ch.consumerCount}</td>
+              `;
+              channelsBody.appendChild(tr);
+            });
+          }
+        });
+    }
+
+    btnRefresh.addEventListener('click', loadChannels);
+    loadChannels();
+  </script>
+</body>
+</html>

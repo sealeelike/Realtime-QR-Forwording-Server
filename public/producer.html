@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Producer - QR Forwarding</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/producer.html">Producer</a>
+    <a href="/consumer.html">Consumer</a>
+  </nav>
+  
+  <div class="container">
+    <h1>Producer</h1>
+    
+    <div id="status" class="status disconnected">Connecting...</div>
+    
+    <div id="channel-info" class="section hidden">
+      <h2>Channel ID</h2>
+      <div class="channel-id" id="channel-id">-</div>
+      <p class="info">Consumers connected: <span id="consumer-count">0</span></p>
+      <div class="share-section">
+        <input type="text" id="share-link" readonly>
+        <button id="btn-copy-link">Copy Link</button>
+      </div>
+      <p class="info" id="copy-status"></p>
+    </div>
+    
+    <div class="section">
+      <h2>Camera</h2>
+      <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+      </div>
+      <canvas id="canvas"></canvas>
+      <button id="btn-start-camera">Start Camera</button>
+    </div>
+    
+    <div class="section">
+      <h2>Last Detected URL</h2>
+      <div class="url-display" id="last-url">No QR code detected yet</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="/js/producer.js"></script>
+</body>
+</html>
