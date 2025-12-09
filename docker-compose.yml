@@ -6,4 +6,15 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # REQUIRED: Owner account credentials
+      - OWNER_USERNAME=admin
+      - OWNER_PASSWORD=change-this-password
+      # REQUIRED for production: JWT secret key
+      - JWT_SECRET=change-this-to-a-random-secret-key
+      # Optional: JWT expiration time (default: 24h)
+      - JWT_EXPIRES=24h
+    volumes:
+      # Persist database and logs
+      - ./data:/app/data
+      - ./logs:/app/logs
     restart: unless-stopped

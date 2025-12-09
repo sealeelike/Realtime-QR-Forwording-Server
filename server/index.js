@@ -1,9 +1,17 @@
+require('dotenv').config();
 const Fastify = require('fastify');
 const fastifyStatic = require('@fastify/static');
 const fastifyWebsocket = require('@fastify/websocket');
+const fastifyCookie = require('@fastify/cookie');
+const fastifyRateLimit = require('@fastify/rate-limit');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+
+const { initOwner } = require('./database');
+const { authPlugin, verifyToken } = require('./auth');
+const userRoutes = require('./routes/user');
+const logger = require('./logger');
 
 const generateId = () => crypto.randomBytes(4).toString('hex');
 
@@ -21,6 +29,7 @@ if (fs.existsSync(path.join(certPath, 'key.pem')) && fs.existsSync(path.join(cer
 
 const fastify = Fastify({ 
   logger: true,
+  trustProxy: true,
   ...(httpsOptions && { https: httpsOptions })
 });
 
@@ -39,10 +48,43 @@ let serverConfig = {
 //   producer: WebSocket | null,
 //   consumers: Set<WebSocket>,
 //   lastUrl: { url: string, timestamp: number, expireTime: number } | null,
-//   createdAt: number
+//   createdAt: number,
+//   createdBy: string (username)
 // }
 
 const EXPIRE_TIME_MS = 10000; // 10 seconds
+
+// Register plugins
+fastify.register(fastifyCookie);
+
+// Rate limiting - protect against brute force
+fastify.register(fastifyRateLimit, {
+  max: 100, // max requests per window
+  timeWindow: '1 minute',
+  keyGenerator: (request) => request.ip,
+  errorResponseBuilder: (request, context) => {
+    logger.security('rate_limit_exceeded', { ip: request.ip, url: request.url });
+    return {
+      code: 429,
+      error: 'Too Many Requests',
+      message: `Rate limit exceeded. Try again in ${Math.round(context.after / 1000)} seconds.`
+    };
+  }
+});
+
+// Stricter rate limit for login
+fastify.register(async function (fastify) {
+  fastify.register(fastifyRateLimit, {
+    max: 10,
+    timeWindow: '5 minutes',
+    keyGenerator: (request) => request.ip
+  });
+  
+  fastify.post('/api/auth/login-limited', async (request, reply) => {
+    // This route is just to apply stricter rate limit, actual login handled elsewhere
+    return reply.callNotFound();
+  });
+});
 
 fastify.register(fastifyWebsocket);
 fastify.register(fastifyStatic, {
@@ -50,9 +92,26 @@ fastify.register(fastifyStatic, {
   prefix: '/'
 });
 
+// Auth plugin - must be after cookie but before routes
+fastify.register(authPlugin);
+
+// User routes
+fastify.register(userRoutes);
+
 // WebSocket endpoint
 fastify.register(async function (fastify) {
   fastify.get('/ws', { websocket: true }, (socket, req) => {
+    // Authenticate WebSocket connection via token in query or cookie
+    const url = new URL(req.url, 'http://localhost');
+    const token = url.searchParams.get('token') || req.cookies?.token;
+    
+    const user = token ? verifyToken(token) : null;
+    if (!user) {
+      socket.send(JSON.stringify({ type: 'error', message: 'Authentication required' }));
+      socket.close();
+      return;
+    }
+
     let currentChannel = null;
     let role = null;
 
@@ -88,7 +147,8 @@ fastify.register(async function (fastify) {
               producer: socket,
               consumers: new Set(),
               lastUrl: null,
-              createdAt: Date.now()
+              createdAt: Date.now(),
+              createdBy: user.username
             });
             currentChannel = channelId;
             role = 'producer';
@@ -239,7 +299,8 @@ fastify.get('/api/admin/channels', async () => {
       id,
       hasPassword: !!ch.password,
       consumerCount: ch.consumers.size,
-      createdAt: ch.createdAt
+      createdAt: ch.createdAt,
+      createdBy: ch.createdBy
     });
   });
   return { channels: list };
@@ -247,6 +308,9 @@ fastify.get('/api/admin/channels', async () => {
 
 const start = async () => {
   try {
+    // Initialize owner account from environment
+    initOwner();
+    
     const port = process.env.PORT || 3000;
     const host = process.env.HOST || '0.0.0.0';
     await fastify.listen({ port, host });

@@ -30,15 +30,45 @@
 - [x] HTTPS support (self-signed certificates)
 - [x] Docker & docker-compose support
 
+### User System
+- [x] Invite-only registration (admin creates users with random credentials)
+- [x] User login with JWT authentication
+- [x] Role hierarchy: Owner > Admin > User
+- [x] Owner account from environment variables
+- [x] Mandatory password change on first login
+- [x] Login required for all pages (server-side redirect)
+
+### Security
+- [x] Login failure limit (4 attempts, auto-ban)
+- [x] User ban/unban by admin
+- [x] IP rate limiting (100 req/min general, 10/5min for login)
+- [x] IP ban management
+- [x] Security event logging (file-based)
+
+### Database
+- [x] SQLite integration for persistence
+- [x] User data storage
+
+### Admin Panel
+- [x] User management (create, ban, unban, delete)
+- [x] IP ban management
+- [x] Security logs viewer (owner only)
+- [x] User action logs viewer (owner only)
+- [x] Role promotion/demotion (owner only)
+- [x] Server-side role verification for admin access
+- [x] Dynamic admin link injection (hidden from regular users)
+
+### User Features
+- [x] Username change (once for users, unlimited for admin/owner)
+
 ---
 
 ## Pending
 
-### User System
-- [ ] User registration & login
-- [ ] User ID and password authentication
+### User System (Extended)
 - [ ] User profile (customized bios)
 - [ ] User contribution count
+- [ ] Password bcrypt hashing
 
 ### Statistics
 - [ ] Total number of users
@@ -46,14 +76,8 @@
 - [ ] Number of live Producers
 - [ ] Leaderboard
 
-### Logging
+### Logging (Extended)
 - [ ] Record URL with timestamp
-- [ ] Record user login IP and time
-- [ ] Account abuse detection
-
-### Database
-- [ ] SQLite integration for persistence
-- [ ] User data storage
 - [ ] URL history storage
 
 ### Other

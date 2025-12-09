@@ -1,3 +1,32 @@
+// Auth check and logout
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/auth/me');
+    if (!res.ok) {
+      window.location.href = '/login.html';
+      return false;
+    }
+    const data = await res.json();
+    document.getElementById('currentUser').textContent = `${data.user.username} (${data.user.role})`;
+    
+    // Inject admin link for admin/owner
+    if (data.user.role === 'admin' || data.user.role === 'owner') {
+      document.getElementById('admin-nav').innerHTML = '<a href="/admin.html">Admin</a>';
+    }
+    
+    document.body.classList.add('auth-ready');
+    return true;
+  } catch {
+    window.location.href = '/login.html';
+    return false;
+  }
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/login.html';
+}
+
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -148,4 +177,7 @@ btnCopyLink.addEventListener('click', () => {
 
 btnStartCamera.addEventListener('click', startCamera);
 
-connect();
+// Initialize
+checkAuth().then(ok => {
+  if (ok) connect();
+});

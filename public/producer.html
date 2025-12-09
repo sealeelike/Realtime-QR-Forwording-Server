@@ -5,12 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Producer - QR Forwarding</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body { visibility: hidden; }
+    body.auth-ready { visibility: visible; }
+    .current-user { float: right; padding: 10px; }
+    .logout-btn { color: #d9534f; cursor: pointer; text-decoration: underline; }
+  </style>
 </head>
 <body>
   <nav>
     <a href="/">Home</a>
     <a href="/producer.html">Producer</a>
     <a href="/consumer.html">Consumer</a>
+    <span id="admin-nav"></span>
+    <span class="current-user">
+      <span id="currentUser"></span> | 
+      <span class="logout-btn" onclick="logout()">Logout</span>
+    </span>
   </nav>
   
   <div class="container">

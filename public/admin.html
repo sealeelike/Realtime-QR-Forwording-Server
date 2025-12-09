@@ -5,6 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - QR Forwarding</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Hide content until auth verified */
+    body { visibility: hidden; }
+    body.auth-ready { visibility: visible; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+    .tab { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 16px; }
+    .tab.active { border-bottom: 2px solid #4a90d9; margin-bottom: -2px; color: #4a90d9; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .btn-action { padding: 5px 10px; margin: 2px; cursor: pointer; border: 1px solid #ddd; border-radius: 4px; }
+    .btn-danger { background: #d9534f; color: white; border-color: #d9534f; }
+    .btn-success { background: #5cb85c; color: white; border-color: #5cb85c; }
+    .btn-primary { background: #4a90d9; color: white; border-color: #4a90d9; }
+    .user-role { padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .role-owner { background: #d9534f; color: white; }
+    .role-admin { background: #f0ad4e; color: white; }
+    .role-user { background: #5bc0de; color: white; }
+    .status-banned { color: #d9534f; font-weight: bold; }
+    .credentials-box { background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 10px 0; }
+    .credentials-box code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; }
+    .log-entry { font-family: monospace; font-size: 12px; padding: 5px; border-bottom: 1px solid #eee; }
+    .log-security { background: #fff3cd; }
+    .log-user_action { background: #d4edda; }
+    .current-user { float: right; padding: 10px; }
+    .logout-btn { color: #d9534f; cursor: pointer; text-decoration: underline; }
+  </style>
 </head>
 <body>
   <nav>
@@ -12,94 +38,435 @@
     <a href="/producer.html">Producer</a>
     <a href="/consumer.html">Consumer</a>
     <a href="/admin.html">Admin</a>
+    <span class="current-user">
+      <span id="currentUser"></span> | 
+      <span class="logout-btn" onclick="logout()">Logout</span>
+    </span>
   </nav>
   
   <div class="container">
     <h1>Admin Panel</h1>
     
-    <div class="section">
-      <h2>Server Configuration</h2>
-      <label class="info">Domain (for share links)</label>
-      <input type="text" id="domain" placeholder="https://example.com">
-      <p class="info">Leave empty to use current host. Include protocol (https://)</p>
-      <button id="btn-save">Save Configuration</button>
-      <p class="info" id="save-status"></p>
+    <div class="tabs">
+      <button class="tab active" data-tab="users">User Management</button>
+      <button class="tab" data-tab="channels">Channels</button>
+      <button class="tab" data-tab="ipbans">IP Bans</button>
+      <button class="tab" data-tab="logs" id="logs-tab" style="display:none;">Logs</button>
+      <button class="tab" data-tab="config">Configuration</button>
     </div>
-    
-    <div class="section">
-      <h2>Active Channels</h2>
-      <button id="btn-refresh">Refresh</button>
-      <table id="channels-table" style="width:100%; margin-top:1rem; border-collapse:collapse;">
-        <thead>
-          <tr style="border-bottom:1px solid #000;">
-            <th style="text-align:left; padding:0.5rem;">ID</th>
-            <th style="text-align:left; padding:0.5rem;">Password</th>
-            <th style="text-align:left; padding:0.5rem;">Consumers</th>
-          </tr>
-        </thead>
-        <tbody id="channels-body">
-        </tbody>
-      </table>
-      <p class="info" id="no-channels">No active channels</p>
+
+    <!-- User Management Tab -->
+    <div id="users" class="tab-content active">
+      <div class="section">
+        <h2>Create New User</h2>
+        <select id="newUserRole">
+          <option value="user">User</option>
+          <option value="admin">Admin (Owner only)</option>
+        </select>
+        <button id="btn-create-user" class="btn-primary">Create User</button>
+        <div id="new-user-result" class="credentials-box" style="display:none;">
+          <p><strong>New User Created!</strong></p>
+          <p>Username: <code id="new-username"></code></p>
+          <p>Password: <code id="new-password"></code></p>
+          <p class="info">User must change password on first login.</p>
+        </div>
+      </div>
+      
+      <div class="section">
+        <h2>Users</h2>
+        <button id="btn-refresh-users" class="btn-action">Refresh</button>
+        <table style="width:100%; margin-top:1rem; border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #000;">
+              <th style="text-align:left; padding:0.5rem;">Username</th>
+              <th style="text-align:left; padding:0.5rem;">Role</th>
+              <th style="text-align:left; padding:0.5rem;">Status</th>
+              <th style="text-align:left; padding:0.5rem;">Failures</th>
+              <th style="text-align:left; padding:0.5rem;">Last Login</th>
+              <th style="text-align:left; padding:0.5rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+        <p class="info" id="no-users" style="display:none;">No users found</p>
+      </div>
+    </div>
+
+    <!-- Channels Tab -->
+    <div id="channels" class="tab-content">
+      <div class="section">
+        <h2>Active Channels</h2>
+        <button id="btn-refresh-channels" class="btn-action">Refresh</button>
+        <table style="width:100%; margin-top:1rem; border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #000;">
+              <th style="text-align:left; padding:0.5rem;">ID</th>
+              <th style="text-align:left; padding:0.5rem;">Password</th>
+              <th style="text-align:left; padding:0.5rem;">Consumers</th>
+              <th style="text-align:left; padding:0.5rem;">Created By</th>
+            </tr>
+          </thead>
+          <tbody id="channels-body"></tbody>
+        </table>
+        <p class="info" id="no-channels">No active channels</p>
+      </div>
+    </div>
+
+    <!-- IP Bans Tab -->
+    <div id="ipbans" class="tab-content">
+      <div class="section">
+        <h2>Ban IP Address</h2>
+        <input type="text" id="ban-ip" placeholder="IP Address" style="width:200px;">
+        <input type="text" id="ban-reason" placeholder="Reason (optional)" style="width:200px;">
+        <button id="btn-ban-ip" class="btn-danger">Ban IP</button>
+      </div>
+      
+      <div class="section">
+        <h2>Banned IPs</h2>
+        <button id="btn-refresh-ipbans" class="btn-action">Refresh</button>
+        <table style="width:100%; margin-top:1rem; border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #000;">
+              <th style="text-align:left; padding:0.5rem;">IP</th>
+              <th style="text-align:left; padding:0.5rem;">Reason</th>
+              <th style="text-align:left; padding:0.5rem;">Banned By</th>
+              <th style="text-align:left; padding:0.5rem;">Time</th>
+              <th style="text-align:left; padding:0.5rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ipbans-body"></tbody>
+        </table>
+        <p class="info" id="no-ipbans">No banned IPs</p>
+      </div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div id="logs" class="tab-content">
+      <div class="section">
+        <h2>Security Logs</h2>
+        <select id="log-type">
+          <option value="security">Security</option>
+          <option value="user-actions">User Actions</option>
+        </select>
+        <button id="btn-refresh-logs" class="btn-action">Refresh</button>
+        <div id="logs-container" style="max-height:400px; overflow-y:auto; margin-top:1rem; border:1px solid #ddd;"></div>
+      </div>
+    </div>
+
+    <!-- Configuration Tab -->
+    <div id="config" class="tab-content">
+      <div class="section">
+        <h2>Server Configuration</h2>
+        <label class="info">Domain (for share links)</label>
+        <input type="text" id="domain" placeholder="https://example.com">
+        <p class="info">Leave empty to use current host. Include protocol (https://)</p>
+        <button id="btn-save" class="btn-primary">Save Configuration</button>
+        <p class="info" id="save-status"></p>
+      </div>
     </div>
   </div>
 
   <script>
-    const domainInput = document.getElementById('domain');
-    const btnSave = document.getElementById('btn-save');
-    const saveStatus = document.getElementById('save-status');
-    const btnRefresh = document.getElementById('btn-refresh');
-    const channelsBody = document.getElementById('channels-body');
-    const noChannels = document.getElementById('no-channels');
+    let currentUser = null;
 
-    // Load current config
-    fetch('/api/admin/config')
-      .then(res => res.json())
-      .then(config => {
-        domainInput.value = config.domain || '';
-      });
+    // Check auth and get current user
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) {
+          window.location.href = '/login.html';
+          return;
+        }
+        const data = await res.json();
+        currentUser = data.user;
+        
+        // Only admin and owner can access this page
+        if (currentUser.role !== 'admin' && currentUser.role !== 'owner') {
+          window.location.href = '/';
+          return;
+        }
+        
+        document.getElementById('currentUser').textContent = `${currentUser.username} (${currentUser.role})`;
+        
+        // Owner-only features
+        if (currentUser.role === 'owner') {
+          document.getElementById('logs-tab').style.display = '';
+        } else {
+          document.querySelector('#newUserRole option[value="admin"]').disabled = true;
+        }
+        // Show page content
+        document.body.classList.add('auth-ready');
+      } catch {
+        window.location.href = '/login.html';
+      }
+    }
 
-    btnSave.addEventListener('click', () => {
-      fetch('/api/admin/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: domainInput.value.trim() })
-      })
-      .then(res => res.json())
-      .then(data => {
-        saveStatus.textContent = 'Configuration saved!';
-        setTimeout(() => { saveStatus.textContent = ''; }, 2000);
-      })
-      .catch(() => {
-        saveStatus.textContent = 'Failed to save';
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
       });
     });
 
-    function loadChannels() {
-      fetch('/api/admin/channels')
-        .then(res => res.json())
-        .then(data => {
-          channelsBody.innerHTML = '';
-          if (data.channels.length === 0) {
-            noChannels.style.display = 'block';
-          } else {
-            noChannels.style.display = 'none';
-            data.channels.forEach(ch => {
-              const tr = document.createElement('tr');
-              tr.style.borderBottom = '1px solid #ddd';
-              tr.innerHTML = `
-                <td style="padding:0.5rem; font-family:monospace;">${ch.id}</td>
-                <td style="padding:0.5rem;">${ch.hasPassword ? 'Yes' : 'No'}</td>
-                <td style="padding:0.5rem;">${ch.consumerCount}</td>
-              `;
-              channelsBody.appendChild(tr);
-            });
-          }
+    // User Management
+    document.getElementById('btn-create-user').addEventListener('click', async () => {
+      const role = document.getElementById('newUserRole').value;
+      try {
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role })
         });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('new-username').textContent = data.user.username;
+          document.getElementById('new-password').textContent = data.user.password;
+          document.getElementById('new-user-result').style.display = 'block';
+          loadUsers();
+        } else {
+          alert(data.error || 'Failed to create user');
+        }
+      } catch (err) {
+        alert('Error creating user');
+      }
+    });
+
+    async function loadUsers() {
+      try {
+        const res = await fetch('/api/admin/users');
+        const data = await res.json();
+        const tbody = document.getElementById('users-body');
+        tbody.innerHTML = '';
+        
+        if (data.users.length === 0) {
+          document.getElementById('no-users').style.display = 'block';
+        } else {
+          document.getElementById('no-users').style.display = 'none';
+          data.users.forEach(user => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #ddd';
+            const lastLogin = user.last_login ? new Date(user.last_login).toLocaleString() : 'Never';
+            
+            let roleButtons = '';
+            if (currentUser.role === 'owner') {
+              if (user.role === 'user') {
+                roleButtons = `<button class="btn-action btn-primary" onclick="promoteUser(${user.id})">Promote to Admin</button>`;
+              } else if (user.role === 'admin') {
+                roleButtons = `<button class="btn-action" onclick="demoteUser(${user.id})">Demote to User</button>`;
+              }
+            }
+            
+            tr.innerHTML = `
+              <td style="padding:0.5rem;">${user.username}</td>
+              <td style="padding:0.5rem;"><span class="user-role role-${user.role}">${user.role}</span></td>
+              <td style="padding:0.5rem;">${user.is_banned ? '<span class="status-banned">BANNED</span>' : 'Active'}</td>
+              <td style="padding:0.5rem;">${user.login_failures}</td>
+              <td style="padding:0.5rem;">${lastLogin}</td>
+              <td style="padding:0.5rem;">
+                ${roleButtons}
+                ${user.is_banned 
+                  ? `<button class="btn-action btn-success" onclick="unbanUser(${user.id})">Unban</button>`
+                  : `<button class="btn-action btn-danger" onclick="banUser(${user.id})">Ban</button>`
+                }
+                ${user.role === 'user' ? `<button class="btn-action btn-danger" onclick="deleteUser(${user.id})">Delete</button>` : ''}
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error('Error loading users', err);
+      }
     }
 
-    btnRefresh.addEventListener('click', loadChannels);
-    loadChannels();
+    async function banUser(id) {
+      if (!confirm('Ban this user?')) return;
+      await fetch(`/api/admin/users/${id}/ban`, { method: 'POST' });
+      loadUsers();
+    }
+
+    async function unbanUser(id) {
+      await fetch(`/api/admin/users/${id}/unban`, { method: 'POST' });
+      loadUsers();
+    }
+
+    async function deleteUser(id) {
+      if (!confirm('Delete this user? This cannot be undone.')) return;
+      await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      loadUsers();
+    }
+
+    async function promoteUser(id) {
+      if (!confirm('Promote this user to Admin?')) return;
+      const res = await fetch(`/api/admin/users/${id}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'admin' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadUsers();
+      } else {
+        alert(data.error || 'Failed to promote user');
+      }
+    }
+
+    async function demoteUser(id) {
+      if (!confirm('Demote this admin to regular user?')) return;
+      const res = await fetch(`/api/admin/users/${id}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadUsers();
+      } else {
+        alert(data.error || 'Failed to demote user');
+      }
+    }
+
+    document.getElementById('btn-refresh-users').addEventListener('click', loadUsers);
+
+    // Channels
+    async function loadChannels() {
+      const res = await fetch('/api/admin/channels');
+      const data = await res.json();
+      const tbody = document.getElementById('channels-body');
+      tbody.innerHTML = '';
+      
+      if (data.channels.length === 0) {
+        document.getElementById('no-channels').style.display = 'block';
+      } else {
+        document.getElementById('no-channels').style.display = 'none';
+        data.channels.forEach(ch => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid #ddd';
+          tr.innerHTML = `
+            <td style="padding:0.5rem; font-family:monospace;">${ch.id}</td>
+            <td style="padding:0.5rem;">${ch.hasPassword ? 'Yes' : 'No'}</td>
+            <td style="padding:0.5rem;">${ch.consumerCount}</td>
+            <td style="padding:0.5rem;">${ch.createdBy || '-'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    document.getElementById('btn-refresh-channels').addEventListener('click', loadChannels);
+
+    // IP Bans
+    document.getElementById('btn-ban-ip').addEventListener('click', async () => {
+      const ip = document.getElementById('ban-ip').value.trim();
+      const reason = document.getElementById('ban-reason').value.trim();
+      if (!ip) return alert('Please enter an IP address');
+      
+      await fetch('/api/admin/ip-bans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, reason })
+      });
+      document.getElementById('ban-ip').value = '';
+      document.getElementById('ban-reason').value = '';
+      loadIPBans();
+    });
+
+    async function loadIPBans() {
+      const res = await fetch('/api/admin/ip-bans');
+      const data = await res.json();
+      const tbody = document.getElementById('ipbans-body');
+      tbody.innerHTML = '';
+      
+      if (data.bans.length === 0) {
+        document.getElementById('no-ipbans').style.display = 'block';
+      } else {
+        document.getElementById('no-ipbans').style.display = 'none';
+        data.bans.forEach(ban => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid #ddd';
+          tr.innerHTML = `
+            <td style="padding:0.5rem; font-family:monospace;">${ban.ip}</td>
+            <td style="padding:0.5rem;">${ban.reason || '-'}</td>
+            <td style="padding:0.5rem;">${ban.banned_by || '-'}</td>
+            <td style="padding:0.5rem;">${new Date(ban.banned_at * 1000).toLocaleString()}</td>
+            <td style="padding:0.5rem;">
+              <button class="btn-action btn-success" onclick="unbanIP('${ban.ip}')">Unban</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    async function unbanIP(ip) {
+      await fetch(`/api/admin/ip-bans/${encodeURIComponent(ip)}`, { method: 'DELETE' });
+      loadIPBans();
+    }
+
+    document.getElementById('btn-refresh-ipbans').addEventListener('click', loadIPBans);
+
+    // Logs
+    async function loadLogs() {
+      const type = document.getElementById('log-type').value;
+      const res = await fetch(`/api/admin/logs/${type}`);
+      const data = await res.json();
+      const container = document.getElementById('logs-container');
+      container.innerHTML = '';
+      
+      if (data.logs.length === 0) {
+        container.innerHTML = '<p class="info">No logs found</p>';
+      } else {
+        data.logs.reverse().forEach(log => {
+          const div = document.createElement('div');
+          div.className = `log-entry log-${log.type}`;
+          div.innerHTML = `<strong>${log.timestamp}</strong> [${log.event || log.type}] ${JSON.stringify(log, null, 0).substring(0, 200)}`;
+          container.appendChild(div);
+        });
+      }
+    }
+
+    document.getElementById('btn-refresh-logs').addEventListener('click', loadLogs);
+    document.getElementById('log-type').addEventListener('change', loadLogs);
+
+    // Configuration
+    const domainInput = document.getElementById('domain');
+    const btnSave = document.getElementById('btn-save');
+    const saveStatus = document.getElementById('save-status');
+
+    async function loadConfig() {
+      const res = await fetch('/api/admin/config');
+      const config = await res.json();
+      domainInput.value = config.domain || '';
+    }
+
+    btnSave.addEventListener('click', async () => {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: domainInput.value.trim() })
+      });
+      if (res.ok) {
+        saveStatus.textContent = 'Configuration saved!';
+        setTimeout(() => { saveStatus.textContent = ''; }, 2000);
+      }
+    });
+
+    // Initialize
+    checkAuth().then(() => {
+      loadUsers();
+      loadChannels();
+      loadIPBans();
+      loadLogs();
+      loadConfig();
+    });
   </script>
 </body>
 </html>
